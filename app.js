@@ -37,6 +37,23 @@ app.post('/api/login', (req, res) => {
 
 // REAL MOMO DEPOSIT - Collect real money to 0541378002
 app.post('/api/deposit/manual', (req,res)=>{
+  // ALIAS FOR FRONTEND - fixes Error Make sure backend is Live
+app.post('/api/deposit', (req, res) => {
+  console.log('DEPOSIT:', req.body);
+  const {amount, phone, momoTransactionId, senderNumber} = req.body;
+  const newDep = {
+    id: Date.now(),
+    amount: Number(amount),
+    phone: phone || senderNumber,
+    momoTransactionId,
+    adminMomo: ADMIN_MOMO,
+    status: 'pending',
+    time: new Date()
+  };
+  deposits.push(newDep);
+  console.log(`💰 CASH to ${ADMIN_MOMO}: GHS ${amount} ID:${momoTransactionId}`);
+  res.json({success:true, message:`Deposit GHS ${amount} to ${ADMIN_MOMO} received! ID ${momoTransactionId} will be verified`, deposit:newDep});
+});
   const {phone, amount, momoTransactionId, senderNumber}=req.body;
   const user=users.find(u=>u.phone===phone);
   if(!user) return res.status(404).json({error:"User not found - Register first"});
