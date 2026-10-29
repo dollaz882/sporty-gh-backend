@@ -5,67 +5,70 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-let users = [];
+let users = []; // {id, phone, password, balance}
 let bets = [];
-
 const matches = [
-  { id: 1, home: "Hearts of Oak", away: "Asante Kotoko", odd1: "2.40", oddX: "2.90", odd2: "2.80", league: "Ghana Premier", time: "Today 15:00" },
-  { id: 2, home: "Man City", away: "Arsenal", odd1: "1.90", oddX: "3.40", odd2: "4.00", league: "Premier League", time: "Today 17:30" },
-  { id: 3, home: "Barcelona", away: "Real Madrid", odd1: "2.50", oddX: "3.20", odd2: "2.60", league: "La Liga", time: "Today 20:00" }
+  { id: 1, home: "Hearts of Oak", away: "Asante Kotoko", odd1: "2.40", oddX: "2.90", odd2: "2.80", league: "Ghana Premier" },
+  { id: 2, home: "Man City", away: "Arsenal", odd1: "1.90", oddX: "3.40", odd2: "4.00", league: "Premier League" },
+  { id: 3, home: "Barcelona", away: "Real Madrid", odd1: "2.50", oddX: "3.80", odd2: "2.60", league: "La Liga" },
+  { id: 4, home: "Kotoko", away: "Hearts", odd1: "2.10", oddX: "3.00", odd2: "3.20", league: "Ghana Premier" },
 ];
 
+// Home
 app.get('/', (req, res) => {
-  res.send('SPORTY GH BACKEND LIVE!');
+  res.send('Sporty GH Backend is LIVE! 🇬🇭🔥 API: /api/matches, /api/register, /api/login, /api/deposit');
 });
 
-app.get('/api/games', (req, res) => {
-  res.json(matches);
-});
-
+// Get matches
 app.get('/api/matches', (req, res) => {
   res.json(matches);
 });
 
+// REGISTER - with phone + password
 app.post('/api/register', (req, res) => {
   const { phone, password } = req.body;
-  users.push({ phone, password, balance: 0 });
-  res.json({ msg: "Registered!", success: true });
+  if (!phone || !password) return res.status(400).json({ error: "Phone and password required" });
+  if (users.find(u => u.phone === phone)) return res.status(400).json({ error: "User already exists" });
+  const user = { id: users.length + 1, phone, password, balance: 0 };
+  users.push(user);
+  res.json({ message: "Registered!", user: { id: user.id, phone: user.phone, balance: user.balance } });
 });
 
+// LOGIN
 app.post('/api/login', (req, res) => {
   const { phone, password } = req.body;
+  const user = users.find(u => u.phone === phone && u.password === password);
+  if (!user) return res.status(400).json({ error: "Wrong phone or password" });
+  res.json({ message: "Login success", user: { id: user.id, phone: user.phone, balance: user.balance } });
+});
+
+// DEPOSIT - MTN MoMo Simulation (We will connect Paystack next)
+app.post('/api/deposit', (req, res) => {
+  const { phone, amount } = req.body;
   const user = users.find(u => u.phone === phone);
-  if(user){
-    res.json({ msg: "Logged in!", user, token: "fake-token" });
-  } else {
-    res.json({ msg: "Not found, please register" });
-  }
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const amt = parseFloat(amount);
+  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: "Invalid amount" });
+  user.balance += amt;
+  res.json({ message: `Deposited GHS ${amt} via MoMo!`, balance: user.balance });
 });
 
-// MAIN BETTING ENDPOINT - HOW PEOPLE BET!
-app.post('/api/place-bet', (req, res) => {
-  const { game, selection, odd, stake } = req.body;
-  if(!stake || stake <= 0){
-    return res.json({ success: false, msg: "Invalid stake" });
-  }
-  const potentialWin = parseFloat(stake) * parseFloat(odd);
-  const newBet = {
-    id: bets.length + 1,
-    game,
-    selection,
-    odd,
-    stake,
-    potentialWin: potentialWin.toFixed(2),
-    status: "pending",
-    time: new Date().toLocaleString()
-  };
-  bets.push(newBet);
-  res.json({ success: true, msg: "Bet placed!", bet: newBet });
+// PLACE BET
+app.post('/api/bet', (req, res) => {
+  const { phone, matchId, odd, amount } = req.body;
+  const user = users.find(u => u.phone === phone);
+  if (!user) return res.status(404).json({ error: "Login first" });
+  if (user.balance < amount) return res.status(400).json({ error: "Insufficient balance - Deposit via MoMo!" });
+  user.balance -= amount;
+  const bet = { id: bets.length + 1, phone, matchId, odd, amount, time: new Date() };
+  bets.push(bet);
+  res.json({ message: "Bet placed!", bet, balance: user.balance });
 });
 
-app.get('/api/bets', (req, res) => {
-  res.json(bets);
+// Get user bets
+app.get('/api/bets/:phone', (req, res) => {
+  res.json(bets.filter(b => b.phone === req.params.phone));
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Running on ${PORT}`));
+app.listen(PORT, () => console.log(`Sporty GH running on ${PORT}`));
